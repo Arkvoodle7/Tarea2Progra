@@ -1,41 +1,43 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Tarea2Progra.Models;
+﻿using Tarea2Progra.Models;
+using System;
 using System.IO;
+using System.Text;
 
 namespace Tarea2Progra.Utilities
 {
     public class Logger
     {
         private string fileName;
+        private string filePath;
         private StringBuilder logBuilder;
 
         public Logger()
         {
             string date = DateTime.Now.ToString("yyyyMMdd");
             int consecutive = 1;
+
             do
             {
                 fileName = $"Simulacion{date}-{consecutive}.txt";
+                filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
                 consecutive++;
-            } while (File.Exists(fileName));
+            } while (File.Exists(filePath));
 
             logBuilder = new StringBuilder();
         }
 
-        public void LogInitialState(GameBoard board, int generation)
+        public void LogInitialState(GameBoard board)
         {
-            logBuilder.AppendLine($"Generación {generation}: Estado inicial");
+            logBuilder.AppendLine("Estado inicial del tablero:");
             LogBoardState(board);
+            SaveLog();
         }
 
         public void LogState(GameBoard board, int generation)
         {
-            logBuilder.AppendLine($"Generación {generation}:");
+            logBuilder.AppendLine($"Estado después de la generación {generation}:");
             LogBoardState(board);
+            SaveLog();
         }
 
         private void LogBoardState(GameBoard board)
@@ -49,19 +51,20 @@ namespace Tarea2Progra.Utilities
                 logBuilder.AppendLine();
             }
             logBuilder.AppendLine();
-            SaveLog();
         }
 
         private void SaveLog()
         {
-            File.WriteAllText(fileName, logBuilder.ToString());
+            File.WriteAllText(filePath, logBuilder.ToString());
         }
 
         public void ClearLog()
         {
             logBuilder.Clear();
-            File.Delete(fileName);
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
         }
     }
 }
-

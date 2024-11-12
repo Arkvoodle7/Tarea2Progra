@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Tarea2Progra.Models;
+﻿using Tarea2Progra.Models;
 using Tarea2Progra.Utilities;
+using System;
+using System.Threading;
+using System.Collections.Generic;
 
 namespace Tarea2Progra.Controllers
 {
@@ -14,6 +12,9 @@ namespace Tarea2Progra.Controllers
         private int threadCount;
         private Logger logger;
         private int generation = 0;
+        private List<Thread> threads;
+        private Cell[,] newCells;
+        private ManualResetEvent[] resetEvents;
 
         public GameController(int width, int height, int threadCount, bool randomize, Logger logger)
         {
@@ -26,45 +27,75 @@ namespace Tarea2Progra.Controllers
                 RandomizeBoard();
             }
 
-            logger.LogInitialState(GameBoard, generation);
+            logger.LogInitialState(GameBoard);
         }
 
         public void NextGeneration()
         {
             generation++;
-            var newBoard = new GameBoard(GameBoard.Width, GameBoard.Height);
-            int regionHeight = GameBoard.Height / threadCount;
-
-            Parallel.For(0, threadCount, i =>
+            newCells = new Cell[GameBoard.Width, GameBoard.Height];
+            for (int x = 0; x < GameBoard.Width; x++)
             {
-                int yStart = i * regionHeight;
-                int yEnd = (i == threadCount - 1) ? GameBoard.Height : yStart + regionHeight;
-
-                for (int x = 0; x < GameBoard.Width; x++)
+                for (int y = 0; y < GameBoard.Height; y++)
                 {
-                    for (int y = yStart; y < yEnd; y++)
-                    {
-                        int aliveNeighbors = CountAliveNeighbors(x, y);
-                        bool isAlive = GameBoard.Cells[x, y].IsAlive;
+                    newCells[x, y] = new Cell();
+                }
+            }
 
-                        if (!isAlive && aliveNeighbors == 3)
-                        {
-                            newBoard.Cells[x, y].IsAlive = true;
-                        }
-                        else if (isAlive && (aliveNeighbors == 2 || aliveNeighbors == 3))
-                        {
-                            newBoard.Cells[x, y].IsAlive = true;
-                        }
-                        else
-                        {
-                            newBoard.Cells[x, y].IsAlive = false;
-                        }
+            int regionHeight = GameBoard.Height / threadCount;
+            resetEvents = new ManualResetEvent[threadCount];
+
+            threads = new List<Thread>();
+
+            for (int i = 0; i < threadCount; i++)
+            {
+                int threadIndex = i;
+                resetEvents[threadIndex] = new ManualResetEvent(false);
+
+                Thread thread = new Thread(() => ProcessRegion(threadIndex, regionHeight));
+                threads.Add(thread);
+                thread.Start();
+            }
+
+            // Esperar a que todos los hilos terminen su procesamiento
+            WaitHandle.WaitAll(resetEvents);
+
+            // Actualizar el tablero con los nuevos estados
+            GameBoard.Cells = newCells;
+
+            // Registrar el estado después de la generación actual
+            logger.LogState(GameBoard, generation);
+        }
+
+        private void ProcessRegion(int threadIndex, int regionHeight)
+        {
+            int yStart = threadIndex * regionHeight;
+            int yEnd = (threadIndex == threadCount - 1) ? GameBoard.Height : yStart + regionHeight;
+
+            for (int x = 0; x < GameBoard.Width; x++)
+            {
+                for (int y = yStart; y < yEnd; y++)
+                {
+                    int aliveNeighbors = CountAliveNeighbors(x, y);
+                    bool isAlive = GameBoard.Cells[x, y].IsAlive;
+
+                    if (!isAlive && aliveNeighbors == 3)
+                    {
+                        newCells[x, y].IsAlive = true;
+                    }
+                    else if (isAlive && (aliveNeighbors == 2 || aliveNeighbors == 3))
+                    {
+                        newCells[x, y].IsAlive = true;
+                    }
+                    else
+                    {
+                        newCells[x, y].IsAlive = false;
                     }
                 }
-            });
+            }
 
-            GameBoard = newBoard;
-            logger.LogState(GameBoard, generation);
+            // Señalar que este hilo ha terminado su procesamiento
+            resetEvents[threadIndex].Set();
         }
 
         private int CountAliveNeighbors(int x, int y)
@@ -109,4 +140,3 @@ namespace Tarea2Progra.Controllers
         }
     }
 }
-
