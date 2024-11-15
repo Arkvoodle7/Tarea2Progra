@@ -17,9 +17,10 @@ namespace Tarea2Progra
         private GameController gameController;
         private int cellSize = 10;
         private bool isRunning = false;
-        private bool isManualSetup = false;
         private CancellationTokenSource cancellationTokenSource;
         private Logger logger;
+        private int totalGenerations = 0;
+        private int currentGeneration = 0;
 
         public MainWindow()
         {
@@ -29,24 +30,9 @@ namespace Tarea2Progra
 
         private void ManualSetupButton_Click(object sender, RoutedEventArgs e)
         {
-            int width, height, threadCount;
-
-            if (!int.TryParse(WidthTextBox.Text, out width) ||
-                !int.TryParse(HeightTextBox.Text, out height) ||
-                !int.TryParse(ThreadCountTextBox.Text, out threadCount))
-            {
-                MessageBox.Show("Por favor, ingrese valores numéricos válidos para el ancho, alto y número de hilos.");
+            if (!InitializeGame(false))
                 return;
-            }
 
-            if (threadCount < 2 || threadCount % 2 != 0)
-            {
-                MessageBox.Show("El número de hilos debe ser par y mayor o igual a 2.");
-                return;
-            }
-
-            gameController = new GameController(width, height, threadCount, false, logger);
-            isManualSetup = true;
             DrawBoard();
             StartButton.IsEnabled = true;
 
@@ -55,6 +41,15 @@ namespace Tarea2Progra
 
         private void RandomSetupButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!InitializeGame(true))
+                return;
+
+            DrawBoard();
+            StartButton.IsEnabled = true;
+        }
+
+        private bool InitializeGame(bool randomize)
+        {
             int width, height, threadCount;
 
             if (!int.TryParse(WidthTextBox.Text, out width) ||
@@ -62,19 +57,24 @@ namespace Tarea2Progra
                 !int.TryParse(ThreadCountTextBox.Text, out threadCount))
             {
                 MessageBox.Show("Por favor, ingrese valores numéricos válidos para el ancho, alto y número de hilos.");
-                return;
+                return false;
             }
 
             if (threadCount < 2 || threadCount % 2 != 0)
             {
                 MessageBox.Show("El número de hilos debe ser par y mayor o igual a 2.");
-                return;
+                return false;
             }
 
-            gameController = new GameController(width, height, threadCount, true, logger);
-            isManualSetup = false;
-            DrawBoard();
-            StartButton.IsEnabled = true;
+            if (!int.TryParse(GenerationCountTextBox.Text, out totalGenerations) || totalGenerations <= 0)
+            {
+                MessageBox.Show("Por favor, ingrese un número válido de generaciones mayor que cero.");
+                return false;
+            }
+
+            gameController = new GameController(width, height, threadCount, randomize, logger);
+            currentGeneration = 0;
+            return true;
         }
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
@@ -86,7 +86,6 @@ namespace Tarea2Progra
             }
 
             isRunning = true;
-            isManualSetup = false;
             StartButton.IsEnabled = false;
             PauseButton.IsEnabled = true;
             ResetButton.IsEnabled = true;
@@ -108,6 +107,7 @@ namespace Tarea2Progra
             isRunning = true;
             PauseButton.IsEnabled = true;
             ResumeButton.IsEnabled = false;
+
             cancellationTokenSource = new CancellationTokenSource();
             Task.Run(() => RunGame(cancellationTokenSource.Token));
         }
@@ -121,21 +121,62 @@ namespace Tarea2Progra
             ResetButton.IsEnabled = false;
             cancellationTokenSource.Cancel();
             gameController.Reset();
+            currentGeneration = 0;
             DrawBoard();
         }
 
         private void RunGame(CancellationToken token)
         {
-            while (isRunning)
+            while (isRunning && currentGeneration < totalGenerations)
             {
+                currentGeneration++;
                 gameController.NextGeneration();
-                Dispatcher.Invoke(() => DrawBoard());
-                Thread.Sleep(500); // Pausa entre generaciones
 
                 if (token.IsCancellationRequested)
                 {
                     break;
                 }
+
+                bool stepByStep = false;
+
+                // Accedemos a StepByStepCheckBox.IsChecked dentro del Dispatcher
+                Dispatcher.Invoke(() =>
+                {
+                    stepByStep = StepByStepCheckBox.IsChecked == true;
+                });
+
+                if (stepByStep)
+                {
+                    // Pausar para permitir al usuario editar el tablero
+                    isRunning = false;
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        PauseButton.IsEnabled = false;
+                        ResumeButton.IsEnabled = true;
+                        DrawBoard(); // Actualizar la interfaz después de cambiar isRunning
+                    });
+
+                    break;
+                }
+                else
+                {
+                    Dispatcher.Invoke(() => DrawBoard());
+                    Thread.Sleep(500); // Pausa entre generaciones automáticas
+                }
+            }
+
+            if (currentGeneration >= totalGenerations)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show("La simulación ha alcanzado el número máximo de generaciones.");
+                    isRunning = false;
+                    StartButton.IsEnabled = true;
+                    PauseButton.IsEnabled = false;
+                    ResumeButton.IsEnabled = false;
+                    ResetButton.IsEnabled = false;
+                });
             }
         }
 
@@ -143,6 +184,8 @@ namespace Tarea2Progra
         {
             GameCanvas.Children.Clear();
             var board = gameController.GameBoard;
+            bool stepByStep = StepByStepCheckBox.IsChecked == true;
+
             for (int x = 0; x < board.Width; x++)
             {
                 for (int y = 0; y < board.Height; y++)
@@ -157,8 +200,9 @@ namespace Tarea2Progra
                         Tag = new Tuple<int, int>(x, y)
                     };
 
-                    if (isManualSetup && !isRunning)
+                    if (!isRunning && (stepByStep || currentGeneration == 0))
                     {
+                        // Permitir interacción cuando la simulación está pausada y se ha activado el paso a paso, o durante la configuración inicial
                         rect.MouseDown += Cell_MouseDown;
                     }
 
