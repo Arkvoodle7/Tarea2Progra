@@ -139,7 +139,6 @@ namespace Tarea2Progra
 
                 bool stepByStep = false;
 
-                // Accedemos a StepByStepCheckBox.IsChecked dentro del Dispatcher
                 Dispatcher.Invoke(() =>
                 {
                     stepByStep = StepByStepCheckBox.IsChecked == true;
@@ -147,14 +146,14 @@ namespace Tarea2Progra
 
                 if (stepByStep)
                 {
-                    // Pausar para permitir al usuario editar el tablero
+                    //pausar para permitir al usuario editar el tablero
                     isRunning = false;
 
                     Dispatcher.Invoke(() =>
                     {
                         PauseButton.IsEnabled = false;
                         ResumeButton.IsEnabled = true;
-                        DrawBoard(); // Actualizar la interfaz después de cambiar isRunning
+                        DrawBoard(); //actualizar la interfaz despues de cambiar isRunning
                     });
 
                     break;
@@ -162,7 +161,7 @@ namespace Tarea2Progra
                 else
                 {
                     Dispatcher.Invoke(() => DrawBoard());
-                    Thread.Sleep(500); // Pausa entre generaciones automáticas
+                    Thread.Sleep(500); //pausa entre generaciones automaticas
                 }
             }
 
@@ -202,7 +201,7 @@ namespace Tarea2Progra
 
                     if (!isRunning && (stepByStep || currentGeneration == 0))
                     {
-                        // Permitir interacción cuando la simulación está pausada y se ha activado el paso a paso, o durante la configuración inicial
+                        //permitir interaccion cuando la simulacion esta pausada y se ha activado el paso a paso, o durante la configuracion inicial
                         rect.MouseDown += Cell_MouseDown;
                     }
 
@@ -225,11 +224,11 @@ namespace Tarea2Progra
                 int x = position.Item1;
                 int y = position.Item2;
 
-                // Alternar el estado de la célula
+                //alternar el estado de la celula
                 var cell = gameController.GameBoard.Cells[x, y];
                 cell.IsAlive = !cell.IsAlive;
 
-                // Actualizar la visualización de la célula
+                //actualizar la visualizacion de la celula
                 rect.Fill = cell.IsAlive ? Brushes.Black : Brushes.White;
             }
         }

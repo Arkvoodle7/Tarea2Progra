@@ -57,13 +57,13 @@ namespace Tarea2Progra.Controllers
                 thread.Start();
             }
 
-            // Esperar a que todos los hilos terminen su procesamiento
+            //esperar a que todos los hilos terminen su procesamiento
             WaitHandle.WaitAll(resetEvents);
 
-            // Actualizar el tablero con los nuevos estados
+            //actualizar el tablero con los nuevos estados
             GameBoard.Cells = newCells;
 
-            // Registrar el estado después de la generación actual
+            //registrar el estado despues de la generacion actual
             logger.LogState(GameBoard, generation);
         }
 
@@ -94,7 +94,7 @@ namespace Tarea2Progra.Controllers
                 }
             }
 
-            // Señalar que este hilo ha terminado su procesamiento
+            //señalar que este hilo ha terminado su procesamiento
             resetEvents[threadIndex].Set();
         }
 
