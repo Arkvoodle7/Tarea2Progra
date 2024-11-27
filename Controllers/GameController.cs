@@ -9,6 +9,7 @@ namespace Tarea2Progra.Controllers
     public class GameController
     {
         public GameBoard GameBoard { get; private set; }
+        public int ThreadCount => threadCount;
         private int threadCount;
         private Logger logger;
         private int generation = 0;
@@ -44,7 +45,6 @@ namespace Tarea2Progra.Controllers
 
             int regionHeight = GameBoard.Height / threadCount;
             resetEvents = new ManualResetEvent[threadCount];
-
             threads = new List<Thread>();
 
             for (int i = 0; i < threadCount; i++)
@@ -57,13 +57,9 @@ namespace Tarea2Progra.Controllers
                 thread.Start();
             }
 
-            //esperar a que todos los hilos terminen su procesamiento
             WaitHandle.WaitAll(resetEvents);
 
-            //actualizar el tablero con los nuevos estados
             GameBoard.Cells = newCells;
-
-            //registrar el estado despues de la generacion actual
             logger.LogState(GameBoard, generation);
         }
 
@@ -94,7 +90,6 @@ namespace Tarea2Progra.Controllers
                 }
             }
 
-            //señalar que este hilo ha terminado su procesamiento
             resetEvents[threadIndex].Set();
         }
 
@@ -136,7 +131,6 @@ namespace Tarea2Progra.Controllers
         {
             GameBoard = new GameBoard(GameBoard.Width, GameBoard.Height);
             generation = 0;
-            logger.ClearLog();
         }
     }
 }

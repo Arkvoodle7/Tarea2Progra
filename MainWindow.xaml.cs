@@ -5,10 +5,10 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using System.Windows.Controls;
 
 namespace Tarea2Progra
 {
@@ -18,14 +18,12 @@ namespace Tarea2Progra
         private int cellSize = 10;
         private bool isRunning = false;
         private CancellationTokenSource cancellationTokenSource;
-        private Logger logger;
         private int totalGenerations = 0;
         private int currentGeneration = 0;
 
         public MainWindow()
         {
             InitializeComponent();
-            logger = new Logger();
         }
 
         private void ManualSetupButton_Click(object sender, RoutedEventArgs e)
@@ -72,7 +70,10 @@ namespace Tarea2Progra
                 return false;
             }
 
+            Logger logger = new Logger();
+
             gameController = new GameController(width, height, threadCount, randomize, logger);
+
             currentGeneration = 0;
             return true;
         }
@@ -146,14 +147,13 @@ namespace Tarea2Progra
 
                 if (stepByStep)
                 {
-                    //pausar para permitir al usuario editar el tablero
                     isRunning = false;
 
                     Dispatcher.Invoke(() =>
                     {
                         PauseButton.IsEnabled = false;
                         ResumeButton.IsEnabled = true;
-                        DrawBoard(); //actualizar la interfaz despues de cambiar isRunning
+                        DrawBoard();
                     });
 
                     break;
@@ -161,7 +161,7 @@ namespace Tarea2Progra
                 else
                 {
                     Dispatcher.Invoke(() => DrawBoard());
-                    Thread.Sleep(500); //pausa entre generaciones automaticas
+                    Thread.Sleep(500);
                 }
             }
 
@@ -185,15 +185,25 @@ namespace Tarea2Progra
             var board = gameController.GameBoard;
             bool stepByStep = StepByStepCheckBox.IsChecked == true;
 
+            int regionHeight = board.Height / gameController.ThreadCount;
+
             for (int x = 0; x < board.Width; x++)
             {
                 for (int y = 0; y < board.Height; y++)
                 {
+                    int regionIndex = y / regionHeight;
+                    if (regionIndex >= gameController.ThreadCount)
+                    {
+                        regionIndex = gameController.ThreadCount - 1;
+                    }
+
+                    Brush backgroundBrush = GetRegionBrush(regionIndex);
+
                     Rectangle rect = new Rectangle
                     {
                         Width = cellSize,
                         Height = cellSize,
-                        Fill = board.Cells[x, y].IsAlive ? Brushes.Black : Brushes.White,
+                        Fill = board.Cells[x, y].IsAlive ? Brushes.Black : backgroundBrush,
                         Stroke = Brushes.Gray,
                         StrokeThickness = 0.5,
                         Tag = new Tuple<int, int>(x, y)
@@ -201,7 +211,6 @@ namespace Tarea2Progra
 
                     if (!isRunning && (stepByStep || currentGeneration == 0))
                     {
-                        //permitir interaccion cuando la simulacion esta pausada y se ha activado el paso a paso, o durante la configuracion inicial
                         rect.MouseDown += Cell_MouseDown;
                     }
 
@@ -209,6 +218,47 @@ namespace Tarea2Progra
                     Canvas.SetTop(rect, y * cellSize);
                     GameCanvas.Children.Add(rect);
                 }
+            }
+
+            DrawRegionSeparators(board.Width, board.Height, regionHeight);
+        }
+
+        private Brush GetRegionBrush(int regionIndex)
+        {
+            Brush[] regionBrushes = new Brush[]
+            {
+                Brushes.LightYellow,
+                Brushes.LightBlue,
+                Brushes.LightGreen,
+                Brushes.LightCoral,
+                Brushes.LightGray,
+                Brushes.LightPink,
+                Brushes.LightCyan,
+                Brushes.LightSalmon
+            };
+
+            return regionBrushes[regionIndex % regionBrushes.Length];
+        }
+
+        private void DrawRegionSeparators(int boardWidth, int boardHeight, int regionHeight)
+        {
+            int numberOfRegions = gameController.ThreadCount;
+
+            for (int i = 1; i < numberOfRegions; i++)
+            {
+                double y = i * regionHeight * cellSize;
+
+                Line line = new Line
+                {
+                    X1 = 0,
+                    Y1 = y,
+                    X2 = boardWidth * cellSize,
+                    Y2 = y,
+                    Stroke = Brushes.Red,
+                    StrokeThickness = 2
+                };
+
+                GameCanvas.Children.Add(line);
             }
         }
 
@@ -224,12 +274,10 @@ namespace Tarea2Progra
                 int x = position.Item1;
                 int y = position.Item2;
 
-                //alternar el estado de la celula
                 var cell = gameController.GameBoard.Cells[x, y];
                 cell.IsAlive = !cell.IsAlive;
 
-                //actualizar la visualizacion de la celula
-                rect.Fill = cell.IsAlive ? Brushes.Black : Brushes.White;
+                rect.Fill = cell.IsAlive ? Brushes.Black : rect.Fill;
             }
         }
     }
